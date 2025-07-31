@@ -171,7 +171,12 @@ CREATE TABLE IF NOT EXISTS profile (
 -- Insert Users
 INSERT INTO users (id, email, password, full_name, role) VALUES
 ('40ef4507-b94f-45fd-b58d-83d71bb77381', 'admin@venapictures.com', 'password123', 'Admin Utama', 'Admin'),
-('USR002', 'member@perusahaan.com', 'password123', 'Staff Member', 'Member');
+('USR002', 'member@perusahaan.com', 'password123', 'Staff Member', 'Member')
+ON CONFLICT (id) DO UPDATE SET
+  email = EXCLUDED.email,
+  password = EXCLUDED.password,
+  full_name = EXCLUDED.full_name,
+  role = EXCLUDED.role;
 
 -- Insert Packages
 INSERT INTO packages (id, name, price, description) VALUES
@@ -179,7 +184,11 @@ INSERT INTO packages (id, name, price, description) VALUES
 ('PKG002', 'Paket Premium Wedding', 25000000, 'Paket pernikahan premium dengan foto, video, dan dokumentasi lengkap'),
 ('PKG003', 'Paket Luxury Wedding', 45000000, 'Paket pernikahan mewah dengan semua fasilitas premium'),
 ('PKG004', 'Paket Engagement', 8000000, 'Paket foto dan video lamaran'),
-('PKG005', 'Paket Corporate Event', 12000000, 'Paket dokumentasi acara perusahaan');
+('PKG005', 'Paket Corporate Event', 12000000, 'Paket dokumentasi acara perusahaan')
+ON CONFLICT (id) DO UPDATE SET
+  name = EXCLUDED.name,
+  price = EXCLUDED.price,
+  description = EXCLUDED.description;
 
 -- Insert Add-ons
 INSERT INTO addons (id, name, price) VALUES
@@ -187,27 +196,54 @@ INSERT INTO addons (id, name, price) VALUES
 ('ADD002', 'Photo Booth', 2500000),
 ('ADD003', 'Drone Photography', 2000000),
 ('ADD004', 'Extra Album', 1500000),
-('ADD005', 'Live Streaming', 4000000);
+('ADD005', 'Live Streaming', 4000000)
+ON CONFLICT (id) DO UPDATE SET
+  name = EXCLUDED.name,
+  price = EXCLUDED.price;
 
 -- Insert Team Members
 INSERT INTO team_members (id, name, role, email, phone, standard_fee, reward_balance) VALUES
 ('TM001', 'Budi Photographer', 'Fotografer', 'budi@email.com', '081234567890', 2500000, 0),
 ('TM002', 'Sari Videographer', 'Videografer', 'sari@email.com', '081234567891', 3000000, 0),
 ('TM003', 'Andi Editor', 'Editor', 'andi@email.com', '081234567892', 1500000, 0),
-('TM004', 'Maya Assistant', 'Asisten', 'maya@email.com', '081234567893', 800000, 0);
+('TM004', 'Maya Assistant', 'Asisten', 'maya@email.com', '081234567893', 800000, 0)
+ON CONFLICT (id) DO UPDATE SET
+  name = EXCLUDED.name,
+  role = EXCLUDED.role,
+  email = EXCLUDED.email,
+  phone = EXCLUDED.phone,
+  standard_fee = EXCLUDED.standard_fee,
+  reward_balance = EXCLUDED.reward_balance;
 
 -- Insert Clients
 INSERT INTO clients (id, name, email, phone, since, instagram, status, last_contact) VALUES
 ('CLI001', 'John & Jane Wedding', 'john.jane@email.com', '081234567894', '2024-01-15', '@johnjane_wedding', 'Aktif', '2024-01-15'),
 ('CLI002', 'PT. Maju Bersama', 'info@majubersama.com', '081234567895', '2024-02-01', '@ptmajubersama', 'Aktif', '2024-02-01'),
 ('CLI003', 'Sarah & David', 'sarah.david@email.com', '081234567896', '2024-02-15', '@sarahdavid_couple', 'Prospek', '2024-02-15'),
-('CLI004', 'CV. Sukses Mandiri', 'contact@suksesmandiri.co.id', '081234567897', '2024-03-01', null, 'Aktif', '2024-03-01');
+('CLI004', 'CV. Sukses Mandiri', 'contact@suksesmandiri.co.id', '081234567897', '2024-03-01', null, 'Aktif', '2024-03-01')
+ON CONFLICT (id) DO UPDATE SET
+  name = EXCLUDED.name,
+  email = EXCLUDED.email,
+  phone = EXCLUDED.phone,
+  since = EXCLUDED.since,
+  instagram = EXCLUDED.instagram,
+  status = EXCLUDED.status,
+  last_contact = EXCLUDED.last_contact;
 
 -- Insert Financial Pockets
 INSERT INTO financial_pockets (id, name, description, icon, type, amount, goal_amount, lock_end_date, members) VALUES
 ('POC001', 'Tabungan Equipment', 'Tabungan untuk pembelian peralatan baru', 'piggy-bank', 'Nabung & Bayar', 15000000, 50000000, null, '[]'),
 ('POC002', 'Dana Darurat', 'Dana cadangan untuk situasi darurat', 'lock', 'Terkunci', 25000000, null, '2024-12-31', '[]'),
-('POC003', 'Anggaran Bulanan', 'Anggaran pengeluaran operasional bulanan', 'clipboard-list', 'Anggaran Pengeluaran', 0, 10000000, null, '[]');
+('POC003', 'Anggaran Bulanan', 'Anggaran pengeluaran operasional bulanan', 'clipboard-list', 'Anggaran Pengeluaran', 0, 10000000, null, '[]')
+ON CONFLICT (id) DO UPDATE SET
+  name = EXCLUDED.name,
+  description = EXCLUDED.description,
+  icon = EXCLUDED.icon,
+  type = EXCLUDED.type,
+  amount = EXCLUDED.amount,
+  goal_amount = EXCLUDED.goal_amount,
+  lock_end_date = EXCLUDED.lock_end_date,
+  members = EXCLUDED.members;
 
 -- Insert Projects
 INSERT INTO projects (id, project_name, client_name, client_id, project_type, package_name, package_id, add_ons, date, deadline_date, location, progress, status, total_cost, amount_paid, payment_status, team, notes, accommodation, drive_link, start_time, end_time) VALUES
