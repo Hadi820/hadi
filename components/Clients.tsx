@@ -548,7 +548,7 @@ const Clients: React.FC<ClientsProps> = ({ clients, setClients, projects, setPro
         }
     };
 
-    const handleFormSubmit = (e: React.FormEvent) => {
+    const handleFormSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
         const { totalProject, remainingPayment } = priceCalculations;
@@ -560,107 +560,139 @@ const Clients: React.FC<ClientsProps> = ({ clients, setClients, projects, setPro
             return;
         }
 
-        if (modalMode === 'add') {
-            const newClientId = `CLI${Date.now()}`;
-            const newClient: Client = {
-                id: newClientId,
-                name: formData.clientName,
-                email: formData.email,
-                phone: formData.phone,
-                instagram: formData.instagram,
-                since: new Date().toISOString().split('T')[0],
-                status: ClientStatus.ACTIVE,
-                lastContact: new Date().toISOString(),
-            };
-
-            const newProject: Project = {
-                id: `PRJ${Date.now()}`,
-                projectName: formData.projectName || `Acara ${formData.clientName}`,
-                clientName: newClient.name,
-                clientId: newClient.id,
-                projectType: formData.projectType,
-                packageName: selectedPackage.name,
-                packageId: selectedPackage.id,
-                addOns: selectedAddOns,
-                date: formData.date,
-                location: formData.location,
-                progress: 0,
-                status: ProjectStatus.CONFIRMED,
-                totalCost: totalProject,
-                amountPaid: formData.dp,
-                paymentStatus: formData.dp > 0 ? (remainingPayment <= 0 ? PaymentStatus.LUNAS : PaymentStatus.DP_TERBAYAR) : PaymentStatus.BELUM_BAYAR,
-                team: [],
-                notes: formData.notes,
-                accommodation: formData.accommodation,
-                driveLink: formData.driveLink,
-            };
-
-            setClients(prev => [...prev, newClient]);
-            setProjects(prev => [...prev, newProject]);
-
-            if (newProject.amountPaid > 0) {
-                const newTransaction: Transaction = {
-                    id: `TRN-DP-${newProject.id}`,
-                    date: new Date().toISOString().split('T')[0],
-                    description: `DP Proyek ${newProject.projectName}`,
-                    amount: newProject.amountPaid,
-                    type: TransactionType.INCOME,
-                    projectId: newProject.id,
-                    category: 'DP Proyek',
-                    method: 'Transfer Bank',
+        try {
+            if (modalMode === 'add') {
+                const newClient: Omit<Client, 'id'> = {
+                    name: formData.clientName,
+                    email: formData.email,
+                    phone: formData.phone,
+                    instagram: formData.instagram,
+                    since: new Date().toISOString().split('T')[0],
+                    status: ClientStatus.ACTIVE,
+                    lastContact: new Date().toISOString(),
                 };
-                setTransactions(prev => [...prev, newTransaction].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
-                showNotification(`Proyek dan transaksi DP untuk ${newProject.projectName} berhasil dicatat dan masuk Kalender.`);
-            } else {
-                 showNotification(`Klien dan proyek baru berhasil ditambahkan ke kalender.`);
-            }
 
-        } else if (modalMode === 'edit' && selectedClient) {
-            const updatedClient: Client = {
-                ...selectedClient,
-                name: formData.clientName,
-                email: formData.email,
-                phone: formData.phone,
-                instagram: formData.instagram,
-            };
-            setClients(prev => prev.map(c => c.id === selectedClient.id ? updatedClient : c));
+                const createdClient = await SupabaseService.createClient(newClient);
 
-            if (formData.projectId) {
-                setProjects(prev => prev.map(p => p.id === formData.projectId ? {
-                    ...p,
-                    projectName: formData.projectName,
+                const newProject: Omit<Project, 'id'> = {
+                    projectName: formData.projectName || `Acara ${formData.clientName}`,
+                    clientName: createdClient.name,
+                    clientId: createdClient.id,
                     projectType: formData.projectType,
-                    date: formData.date,
-                    location: formData.location,
                     packageName: selectedPackage.name,
                     packageId: selectedPackage.id,
                     addOns: selectedAddOns,
+                    date: formData.date,
+                    deadlineDate: formData.date,
+                    location: formData.location,
+                    progress: 0,
+                    status: ProjectStatus.CONFIRMED,
                     totalCost: totalProject,
                     amountPaid: formData.dp,
                     paymentStatus: formData.dp > 0 ? (remainingPayment <= 0 ? PaymentStatus.LUNAS : PaymentStatus.DP_TERBAYAR) : PaymentStatus.BELUM_BAYAR,
+                    team: [],
                     notes: formData.notes,
                     accommodation: formData.accommodation,
                     driveLink: formData.driveLink,
-                } : p));
+                    startTime: '',
+                    endTime: ''
+                };
+
+                const createdProject = await SupabaseService.createProject(newProject);
+
+                setClients(prev => [...prev, createdClient]);
+                setProjects(prev => [...prev, createdProject]);
+
+                if (createdProject.amountPaid > 0) {
+                    const newTransaction: Omit<Transaction, 'id'> = {
+                        date: new Date().toISOString().split('T')[0],
+                        description: `DP Proyek ${createdProject.projectName}`,
+                        amount: createdProject.amountPaid,
+                        type: TransactionType.INCOME,
+                        projectId: createdProject.id,
+                        category: 'DP Proyek',
+                        method: 'Transfer Bank',
+                        pocketId: null
+                    };
+                    const createdTransaction = await SupabaseService.createTransaction(newTransaction);
+                    setTransactions(prev => [...prev, createdTransaction].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+                    showNotification(`Proyek dan transaksi DP untuk ${createdProject.projectName} berhasil dicatat dan masuk Kalender.`);
+                } else {
+                     showNotification(`Klien dan proyek baru berhasil ditambahkan ke kalender.`);
+                }
+
+            } else if (modalMode === 'edit' && selectedClient) {
+                const updatedClient = await SupabaseService.updateClient(selectedClient.id, {
+                    name: formData.clientName,
+                    email: formData.email,
+                    phone: formData.phone,
+                    instagram: formData.instagram,
+                });
+                
+                setClients(prev => prev.map(c => c.id === selectedClient.id ? updatedClient : c));
+
+                if (formData.projectId) {
+                    const updatedProject = await SupabaseService.updateProject(formData.projectId, {
+                        projectName: formData.projectName,
+                        projectType: formData.projectType,
+                        date: formData.date,
+                        location: formData.location,
+                        packageName: selectedPackage.name,
+                        packageId: selectedPackage.id,
+                        addOns: selectedAddOns,
+                        totalCost: totalProject,
+                        amountPaid: formData.dp,
+                        paymentStatus: formData.dp > 0 ? (remainingPayment <= 0 ? PaymentStatus.LUNAS : PaymentStatus.DP_TERBAYAR) : PaymentStatus.BELUM_BAYAR,
+                        notes: formData.notes,
+                        accommodation: formData.accommodation,
+                        driveLink: formData.driveLink,
+                    });
+                    
+                    setProjects(prev => prev.map(p => p.id === formData.projectId ? updatedProject : p));
+                }
+                showNotification('Data klien dan proyek berhasil diperbarui.');
             }
+        } catch (error) {
+            console.error('Error saving data:', error);
+            alert('Terjadi kesalahan saat menyimpan data. Silakan coba lagi.');
         }
+        
         handleCloseModal();
     };
 
-    const handleDelete = (clientId: string) => {
+    const handleDelete = async (clientId: string) => {
         if (window.confirm("Apakah Anda yakin ingin menghapus klien ini? Semua proyek dan transaksi terkait juga akan dihapus. Tindakan ini tidak dapat dibatalkan.")) {
-            const projectIdsToDelete = projects
-                .filter(p => p.clientId === clientId)
-                .map(p => p.id);
+            try {
+                const projectIdsToDelete = projects
+                    .filter(p => p.clientId === clientId)
+                    .map(p => p.id);
 
-            setClients(prev => prev.filter(c => c.id !== clientId));
-            setProjects(prev => prev.filter(p => p.clientId !== clientId));
-            setTransactions(prev => prev.filter(t => !t.projectId || !projectIdsToDelete.includes(t.projectId)));
-            showNotification('Klien berhasil dihapus beserta semua data terkait.');
+                // Delete related transactions first
+                const transactionsToDelete = transactions.filter(t => t.projectId && projectIdsToDelete.includes(t.projectId));
+                for (const transaction of transactionsToDelete) {
+                    await SupabaseService.deleteTransaction(transaction.id);
+                }
+
+                // Delete related projects
+                for (const projectId of projectIdsToDelete) {
+                    await SupabaseService.deleteProject(projectId);
+                }
+
+                // Delete client
+                await SupabaseService.deleteClient(clientId);
+
+                setClients(prev => prev.filter(c => c.id !== clientId));
+                setProjects(prev => prev.filter(p => p.clientId !== clientId));
+                setTransactions(prev => prev.filter(t => !t.projectId || !projectIdsToDelete.includes(t.projectId)));
+                showNotification('Klien berhasil dihapus beserta semua data terkait.');
+            } catch (error) {
+                console.error('Error deleting client:', error);
+                alert('Terjadi kesalahan saat menghapus klien. Silakan coba lagi.');
+            }
         }
     };
     
-     const handleRecordPayment = (projectToUpdate: Project, paymentAmount: number) => {
+     const handleRecordPayment = async (projectToUpdate: Project, paymentAmount: number) => {
         if (!paymentAmount || paymentAmount <= 0) {
             alert("Masukkan jumlah pembayaran yang valid.");
             return;
@@ -672,27 +704,37 @@ const Clients: React.FC<ClientsProps> = ({ clients, setClients, projects, setPro
             return;
         }
 
-        const updatedAmountPaid = projectToUpdate.amountPaid + paymentAmount;
-        const paymentStatus = updatedAmountPaid >= projectToUpdate.totalCost ? PaymentStatus.LUNAS : PaymentStatus.DP_TERBAYAR;
+        try {
+            const updatedAmountPaid = projectToUpdate.amountPaid + paymentAmount;
+            const paymentStatus = updatedAmountPaid >= projectToUpdate.totalCost ? PaymentStatus.LUNAS : PaymentStatus.DP_TERBAYAR;
 
-        setProjects(prev => prev.map(p =>
-            p.id === projectToUpdate.id
-                ? { ...p, amountPaid: updatedAmountPaid, paymentStatus }
-                : p
-        ));
-        
-        const newTransaction: Transaction = {
-            id: `TRN-PAY-${projectToUpdate.id}-${Date.now()}`,
-            date: new Date().toISOString().split('T')[0],
-            description: `Pembayaran sisa tagihan untuk ${projectToUpdate.projectName}`,
-            amount: paymentAmount,
-            type: TransactionType.INCOME,
-            projectId: projectToUpdate.id,
-            category: 'Pelunasan Proyek',
-            method: 'Transfer Bank',
-        };
-        setTransactions(prev => [...prev, newTransaction].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
-        showNotification(`Pembayaran untuk ${projectToUpdate.projectName} berhasil dicatat.`);
+            const updatedProject = await SupabaseService.updateProject(projectToUpdate.id, {
+                amountPaid: updatedAmountPaid,
+                paymentStatus
+            });
+
+            setProjects(prev => prev.map(p =>
+                p.id === projectToUpdate.id ? updatedProject : p
+            ));
+            
+            const newTransaction: Omit<Transaction, 'id'> = {
+                date: new Date().toISOString().split('T')[0],
+                description: `Pembayaran sisa tagihan untuk ${projectToUpdate.projectName}`,
+                amount: paymentAmount,
+                type: TransactionType.INCOME,
+                projectId: projectToUpdate.id,
+                category: 'Pelunasan Proyek',
+                method: 'Transfer Bank',
+                pocketId: null
+            };
+            
+            const createdTransaction = await SupabaseService.createTransaction(newTransaction);
+            setTransactions(prev => [...prev, createdTransaction].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+            showNotification(`Pembayaran untuk ${projectToUpdate.projectName} berhasil dicatat.`);
+        } catch (error) {
+            console.error('Error recording payment:', error);
+            alert('Terjadi kesalahan saat mencatat pembayaran. Silakan coba lagi.');
+        }
     };
 
     const handleShareInvoice = async (project: Project, client: Client) => {

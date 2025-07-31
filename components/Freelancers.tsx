@@ -1,5 +1,3 @@
-
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { TeamMember, TeamProjectPayment, Profile, Transaction, TransactionType, TeamPaymentRecord, Project, RewardLedgerEntry } from '../types';
 import { NavigationAction } from '../App';
@@ -7,6 +5,7 @@ import PageHeader from './PageHeader';
 import Modal from './Modal';
 import FreelancerProjects from './FreelancerProjects';
 import { PlusIcon, PencilIcon, Trash2Icon, EyeIcon, PrinterIcon, CreditCardIcon, FileTextIcon, HistoryIcon, Share2Icon, PiggyBankIcon, LightbulbIcon, StarIcon } from '../constants';
+import { SupabaseService } from '../services/supabaseService';
 
 const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(amount);
@@ -37,7 +36,7 @@ const RewardSavingsTab: React.FC<{
                 Tarik Seluruh Saldo Hadiah
             </button>
         </div>
-        
+
         <div className="my-8 px-1">
             <h4 className="text-lg font-semibold text-slate-800 mb-4 text-center">Saran Strategis</h4>
             {suggestions.length > 0 ? (
@@ -102,7 +101,7 @@ const CreatePaymentTab: React.FC<{
 }> = ({ member, paymentDetails, paymentAmount, setPaymentAmount, onPay, onShare, onPrint, onSetTab, renderPaymentDetailsContent }) => (
     <div>
          {renderPaymentDetailsContent()}
-         
+
         <div className="mt-6 pt-6 border-t non-printable space-y-4">
             <h5 className="font-semibold text-slate-800 text-base">Buat Pembayaran</h5>
             <div className="flex items-end gap-4">
@@ -218,7 +217,7 @@ const Freelancers: React.FC<FreelancersProps> = ({
     const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
     const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null);
     const [formData, setFormData] = useState<Omit<TeamMember, 'id' | 'rewardBalance'>>(emptyMember);
-    
+
     // State for detail/payment modal
     const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
     const [selectedMemberForDetail, setSelectedMemberForDetail] = useState<TeamMember | null>(null);
@@ -257,7 +256,7 @@ const Freelancers: React.FC<FreelancersProps> = ({
 
     const strategicSuggestions = useMemo(() => {
         if (!selectedMemberForDetail) return [];
-        
+
         const suggestions: {id: string, icon: React.ReactNode, title: string, text: string}[] = [];
         const memberId = selectedMemberForDetail.id;
         const rewardBalance = selectedMemberForDetail.rewardBalance;
@@ -297,7 +296,7 @@ const Freelancers: React.FC<FreelancersProps> = ({
                 });
             }
         }
-        
+
         // General Suggestion, only if no other specific suggestions are present
         if (suggestions.length === 0) {
             suggestions.push({
@@ -322,14 +321,14 @@ const Freelancers: React.FC<FreelancersProps> = ({
         setSelectedMember(null);
         setFormData(emptyMember);
     };
-    
+
     const handleOpenDetailModal = (member: TeamMember) => {
         setSelectedMemberForDetail(member);
         setProjectsToPay([]);
         setDetailTab('projects');
         setIsDetailModalOpen(true);
     }
-    
+
     const handleCloseDetailModal = () => {
         setIsDetailModalOpen(false);
         setSelectedMemberForDetail(null);
@@ -341,31 +340,64 @@ const Freelancers: React.FC<FreelancersProps> = ({
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: name === 'standardFee' ? Number(value) : value }));
     };
-    
-    const handleFormSubmit = (e: React.FormEvent) => {
+
+    const handleFormSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (modalMode === 'add') {
-            setTeamMembers(prev => [...prev, { ...formData, id: `TM${Date.now()}`, rewardBalance: 0 }]);
-        } else if (modalMode === 'edit' && selectedMember) {
-            setTeamMembers(prev => prev.map(m => m.id === selectedMember.id ? { ...selectedMember, ...formData } : m));
+
+        try {
+            if (modalMode === 'add') {
+                const newMember: Omit<TeamMember, 'id'> = {
+                    name: formData.name,
+                    role: formData.role,
+                    email: formData.email,
+                    phone: formData.phone,
+                    standardFee: formData.standardFee,
+                    rewardBalance: 0
+                };
+
+                const createdMember = await SupabaseService.createTeamMember(newMember);
+                setTeamMembers(prev => [...prev, createdMember]);
+                showNotification('Freelancer baru berhasil ditambahkan.');
+            } else if (modalMode === 'edit' && selectedMember) {
+                const updatedMember = await SupabaseService.updateTeamMember(selectedMember.id, {
+                    name: formData.name,
+                    role: formData.role,
+                    email: formData.email,
+                    phone: formData.phone,
+                    standardFee: formData.standardFee
+                });
+
+                setTeamMembers(prev => prev.map(tm => tm.id === selectedMember.id ? updatedMember : tm));
+                showNotification('Data freelancer berhasil diperbarui.');
+            }
+        } catch (error) {
+            console.error('Error saving team member:', error);
+            alert('Terjadi kesalahan saat menyimpan data freelancer. Silakan coba lagi.');
         }
+
         handleCloseModal();
     };
 
-    const handleDelete = (memberId: string) => {
+    const handleDelete = async (memberId: string) => {
         const isAssigned = projects.some(p => p.team.some(t => t.memberId === memberId));
         if (isAssigned) {
              if (!window.confirm("Freelancer ini ditugaskan ke beberapa proyek. Menghapus mereka akan menghapus mereka dari proyek-proyek tersebut. Lanjutkan?")) return;
         } else {
             if (!window.confirm("Yakin ingin menghapus freelancer ini?")) return;
         }
-        
-        setProjects(prev => prev.map(p => ({ ...p, team: p.team.filter(t => t.memberId !== memberId) })));
-        setTeamMembers(prev => prev.filter(m => m.id !== memberId));
-        setTeamProjectPayments(prev => prev.filter(p => p.teamMemberId !== memberId));
-        showNotification("Freelancer berhasil dihapus.");
-    }
-    
+
+        try {
+            await SupabaseService.deleteTeamMember(memberId);
+             setProjects(prev => prev.map(p => ({ ...p, team: p.team.filter(t => t.memberId !== memberId) })));
+             setTeamProjectPayments(prev => prev.filter(p => p.teamMemberId !== memberId));
+            setTeamMembers(prev => prev.filter(tm => tm.id !== memberId));
+            showNotification('Freelancer berhasil dihapus.');
+        } catch (error) {
+            console.error('Error deleting team member:', error);
+            alert('Terjadi kesalahan saat menghapus freelancer. Silakan coba lagi.');
+        }
+    };
+
     const handleToggleProjectForPayment = (projectPaymentId: string) => {
         setProjectsToPay(prev => 
             prev.includes(projectPaymentId)
@@ -394,7 +426,7 @@ const Freelancers: React.FC<FreelancersProps> = ({
             alert("Harap masukkan jumlah pembayaran yang valid dan lebih besar dari nol.");
             return;
         }
-        
+
         const { projects: selectedProjectsForPayment, total: totalSelectedAmount } = paymentDetails;
         if (amountToPay > totalSelectedAmount) {
             alert(`Jumlah pembayaran melebihi total tagihan yang dipilih (${formatCurrency(totalSelectedAmount)}).`);
@@ -404,7 +436,7 @@ const Freelancers: React.FC<FreelancersProps> = ({
         if (window.confirm(`Anda akan membayar sejumlah ${formatCurrency(amountToPay)} untuk ${selectedMemberForDetail.name}. Lanjutkan?`)) {
             let remainingAmountToDistribute = amountToPay;
             const newlyPaidProjectIds: string[] = [];
-            
+
             const sortedProjectsToPay = [...selectedProjectsForPayment].sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
             const updatedProjectPayments = teamProjectPayments.map(p => {
@@ -446,14 +478,14 @@ const Freelancers: React.FC<FreelancersProps> = ({
             };
             let allNewTransactions: Transaction[] = [...transactions, newTransaction];
             showNotification(`Pembayaran fee sebesar ${formatCurrency(amountToPay)} untuk ${selectedMemberForDetail.name} berhasil dicatat.`);
-            
+
             // Handle Rewards
             const paidProjectPaymentsWithRewards = teamProjectPayments
                 .filter(p => newlyPaidProjectIds.includes(p.id) && p.reward && p.reward > 0);
 
             if (paidProjectPaymentsWithRewards.length > 0) {
                 const totalRewardAmount = paidProjectPaymentsWithRewards.reduce((sum, p) => sum + (p.reward || 0), 0);
-                
+
                 const newRewardLedgerEntries: RewardLedgerEntry[] = paidProjectPaymentsWithRewards.map(p => {
                     const projectName = projects.find(proj => proj.id === p.projectId)?.projectName || 'Proyek Tidak Ditemukan';
                     return {
@@ -466,7 +498,7 @@ const Freelancers: React.FC<FreelancersProps> = ({
                     };
                 });
                 setRewardLedgerEntries(prev => [...prev, ...newRewardLedgerEntries].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
-                
+
                 const rewardTransactions: Transaction[] = paidProjectPaymentsWithRewards.map(p => {
                     const projectName = projects.find(proj => proj.id === p.projectId)?.projectName || 'Proyek Tidak Ditemukan';
                     return {
@@ -489,26 +521,26 @@ const Freelancers: React.FC<FreelancersProps> = ({
 
                 showNotification(`Hadiah total ${formatCurrency(totalRewardAmount)} ditambahkan ke tabungan ${selectedMemberForDetail.name}.`);
             }
-            
+
             setTransactions(allNewTransactions.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
-            
+
             setProjectsToPay([]);
             setPaymentAmount('');
             setDetailTab('history');
         }
     };
-    
+
     const handleSharePaymentDetails = async (member: TeamMember, paymentProjects: TeamProjectPayment[], total: number, recordNum: string) => {
         const projectList = paymentProjects.map(p => {
              const projectName = projects.find(proj => proj.id === p.projectId)?.projectName || 'Proyek Tidak Ditemukan';
              return `- ${projectName} (${formatCurrency(p.fee)})`
         }).join('\n');
-        
+
         const shareData = {
             title: `Rincian Pembayaran dari ${userProfile.companyName}`,
             text: `Rincian Pembayaran untuk ${member.name}\nNo: ${recordNum}\n\nProyek yang dibayarkan:\n${projectList}\n\nTotal Pembayaran: ${formatCurrency(total)}\n\nTerima kasih atas kerja kerasnya.\nSalam, ${userProfile.companyName}`,
         };
-    
+
         if (navigator.share) {
             try {
                 await navigator.share(shareData);
@@ -526,7 +558,7 @@ const Freelancers: React.FC<FreelancersProps> = ({
 
         if (window.confirm(`Anda akan menarik seluruh saldo hadiah ${selectedMemberForDetail.name} sejumlah ${formatCurrency(selectedMemberForDetail.rewardBalance)}. Lanjutkan?`)) {
             const amountToWithdraw = selectedMemberForDetail.rewardBalance;
-            
+
             const newWithdrawalEntry: RewardLedgerEntry = {
                 id: `RLE-WTH-${selectedMemberForDetail.id}-${Date.now()}`,
                 teamMemberId: selectedMemberForDetail.id,
@@ -546,13 +578,13 @@ const Freelancers: React.FC<FreelancersProps> = ({
                 method: 'Transfer Bank',
             };
             setTransactions(prev => [...prev, withdrawalTransaction].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
-            
+
             setTeamMembers(prev => prev.map(m => 
                 m.id === selectedMemberForDetail.id ? { ...m, rewardBalance: 0 } : m
             ));
 
             showNotification(`Saldo hadiah ${selectedMemberForDetail.name} berhasil ditarik.`);
-            
+
             // Update the state for the modal view immediately
             setSelectedMemberForDetail(prev => prev ? {...prev, rewardBalance: 0} : null);
         }
@@ -622,12 +654,12 @@ const Freelancers: React.FC<FreelancersProps> = ({
         const unpaidProjects = teamProjectPayments.filter(p => p.teamMemberId === selectedMemberForDetail.id && p.status === 'Unpaid');
         const memberPaymentRecords = teamPaymentRecords.filter(inv => inv.teamMemberId === selectedMemberForDetail.id).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
         const memberRewardLedger = rewardLedgerEntries.filter(e => e.teamMemberId === selectedMemberForDetail.id);
-        
+
         const handleGoToPaymentTab = () => {
             setPaymentAmount(paymentDetails.total);
             setDetailTab('createPayment');
         };
-        
+
         let content;
         switch (detailTab) {
             case 'projects':
@@ -706,7 +738,7 @@ const Freelancers: React.FC<FreelancersProps> = ({
             </div>
         )
     }
-  
+
     return (
         <div>
             <PageHeader title="Manajemen Freelancer" subtitle="Kelola, lacak, dan bayar semua freelancer Anda di satu tempat.">
@@ -715,7 +747,7 @@ const Freelancers: React.FC<FreelancersProps> = ({
                     Tambah Freelancer
                 </button>
             </PageHeader>
-            
+
             <div className="bg-white rounded-xl shadow-sm overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm text-left text-slate-500">
@@ -781,7 +813,7 @@ const Freelancers: React.FC<FreelancersProps> = ({
                     </div>
                  </form>
             </Modal>
-            
+
             {selectedMemberForDetail && (
                 <Modal isOpen={isDetailModalOpen} onClose={handleCloseDetailModal} size="4xl" title={`Detail Pembayaran: ${selectedMemberForDetail.name}`}>
                     {renderDetailModalContent()}

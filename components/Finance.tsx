@@ -1,10 +1,8 @@
-
-
 import React, { useState, useMemo, useEffect } from 'react';
-import { Transaction, TransactionType, FinancialPocket, PocketType, Profile, Project, ProjectStatus } from '../types';
+import { Transaction, TransactionType, FinancialPocket, PocketType, Project, Profile } from '../types';
+import { SupabaseService } from '../services/supabaseService';
 import PageHeader from './PageHeader';
 import Modal from './Modal';
-import InteractiveCashflowChart from './InteractiveCashflowChart'; // New Component
 import { PencilIcon, Trash2Icon, PlusIcon, PiggyBankIcon, LockIcon, Users2Icon, ClipboardListIcon, TagIcon, TrendingUpIcon, UsersIcon as UsersIconSm, ChevronRightIcon, LightbulbIcon } from '../constants';
 
 const formatCurrency = (amount: number) => {
@@ -47,7 +45,7 @@ const DonutChart: React.FC<{ data: { label: string; value: number }[], title: st
     if (otherValue > 0) {
         sortedData.push({ label: 'Lainnya', value: otherValue });
     }
-    
+
     const chartTotal = sortedData.reduce((sum, item) => sum + item.value, 0);
 
     return (
@@ -105,7 +103,7 @@ const MiniCashFlowChart: React.FC<{income: number, expense: number}> = ({income,
     const maxVal = Math.max(income, expense, 1); // Avoid division by zero
     const incomeHeight = (income / maxVal) * 100;
     const expenseHeight = (expense / maxVal) * 100;
-    
+
     return (
         <div className="flex items-end h-20 gap-2">
             <div className="flex flex-col items-center flex-1">
@@ -259,7 +257,7 @@ const PocketsView = ({ summary, pockets, pocketsTotal, totalAssets, handleOpenPo
                     const isExpensePocket = p.type === PocketType.EXPENSE;
                     const isSavingPocket = p.type === PocketType.SAVING;
                     const progress = (p.goalAmount && p.goalAmount > 0) ? (p.amount / p.goalAmount) * 100 : 0;
-                    
+
                     return (
                         <div key={p.id} className="bg-white p-5 rounded-xl shadow-sm flex flex-col justify-between">
                             <div>
@@ -333,7 +331,7 @@ const CashflowView = ({ analysis, period, date, analysisTab, onPeriodChange, onD
                         <button onClick={() => onTabChange('projection')} className={`whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm ${analysisTab === 'projection' ? 'border-slate-700 text-slate-800' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>Proyeksi</button>
                     </nav>
                 </div>
-                
+
                 {analysisTab === 'analysis' ? (
                     <>
                         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 mb-8 text-center">
@@ -465,7 +463,7 @@ const getInitialDateRange = () => {
 const Finance: React.FC<FinanceProps> = ({ transactions, setTransactions, pockets, setPockets, projects, profile }) => {
     // Main state
     const [activeTab, setActiveTab] = useState<'transactions' | 'pockets' | 'cashflow' | 'reports'>('transactions');
-    
+
     // Transaction State
     const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
     const [transactionModalMode, setTransactionModalMode] = useState<'add' | 'edit'>('add');
@@ -484,7 +482,7 @@ const Finance: React.FC<FinanceProps> = ({ transactions, setTransactions, pocket
     const [manageAmount, setManageAmount] = useState<number | ''>('');
     const [isCloseBudgetModalOpen, setIsCloseBudgetModalOpen] = useState(false);
     const [destinationPocketId, setDestinationPocketId] = useState('');
-    
+
     // Cashflow State
     const [cashflowPeriod, setCashflowPeriod] = useState<'monthly' | 'yearly'>('monthly');
     const [cashflowDate, setCashflowDate] = useState(new Date().toISOString().slice(0, 7)); // YYYY-MM or YYYY format for month/year picker
@@ -521,7 +519,7 @@ const Finance: React.FC<FinanceProps> = ({ transactions, setTransactions, pocket
             setTransactionFormData(emptyTransaction);
         }
     }, [transactionModalMode, selectedTransaction]);
-    
+
     useEffect(() => {
         if ((pocketModalMode === 'edit' || pocketModalMode === 'manage') && selectedPocket) {
             setPocketFormData(selectedPocket);
@@ -536,7 +534,7 @@ const Finance: React.FC<FinanceProps> = ({ transactions, setTransactions, pocket
         const mainBalance = totalIncome - totalExpense;
         return { totalIncome, totalExpense, mainBalance };
     }, [transactions]);
-    
+
      const baseFilteredTransactions = useMemo(() => {
         const searchLower = filters.search.toLowerCase();
         return transactions.filter(t => {
@@ -555,7 +553,7 @@ const Finance: React.FC<FinanceProps> = ({ transactions, setTransactions, pocket
             return true;
         });
     }, [transactions, filters]);
-    
+
     const expenseCategorySummary = useMemo(() => {
         const expenseTransactions = baseFilteredTransactions.filter(t => t.type === TransactionType.EXPENSE);
         const summary = expenseTransactions.reduce((acc, t) => {
@@ -598,13 +596,13 @@ const Finance: React.FC<FinanceProps> = ({ transactions, setTransactions, pocket
         }
         return baseFilteredTransactions;
     }, [baseFilteredTransactions, activeExpenseCategory, activeIncomeCategory]);
-    
+
     const filteredSummary = useMemo(() => {
         const income = filteredTransactions.filter(t => t.type === TransactionType.INCOME).reduce((s, t) => s + t.amount, 0);
         const expense = filteredTransactions.filter(t => t.type === TransactionType.EXPENSE).reduce((s, t) => s + t.amount, 0);
         return { income, expense, net: income - expense };
     }, [filteredTransactions]);
-    
+
     const { pocketsTotal, totalAssets } = useMemo(() => {
         const totalInPockets = pockets
             .filter(p => p.type === PocketType.SAVING || p.type === PocketType.LOCKED)
@@ -629,7 +627,7 @@ const Finance: React.FC<FinanceProps> = ({ transactions, setTransactions, pocket
                        tDate.getFullYear() === now.getFullYear();
             })
             .reduce((sum, t) => sum + t.amount, 0);
-        
+
         const budget = budgetPocket.goalAmount || 0;
         const remaining = budget - spentThisMonth;
 
@@ -659,59 +657,102 @@ const Finance: React.FC<FinanceProps> = ({ transactions, setTransactions, pocket
         setTransactionFormData(prev => ({ ...prev, [name]: name === 'amount' ? Number(value) : value }));
     };
 
-    const handleTransactionFormSubmit = (e: React.FormEvent) => {
+    const handleTransactionFormSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        
-        let updatedTransactions: Transaction[] = [];
 
-        if (transactionModalMode === 'add') {
-            const newTransaction = { ...transactionFormData, id: `TRN${Date.now()}` };
-            updatedTransactions = [newTransaction, ...transactions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-        } else if (transactionModalMode === 'edit' && selectedTransaction) {
-            updatedTransactions = transactions.map(t =>
-                t.id === selectedTransaction.id ? { ...selectedTransaction, ...transactionFormData } : t
-            ).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        try {
+            if (transactionModalMode === 'add') {
+                const newTransaction: Omit<Transaction, 'id'> = {
+                    date: transactionFormData.date,
+                    description: transactionFormData.description,
+                    amount: transactionFormData.amount,
+                    type: transactionFormData.type as TransactionType,
+                    category: transactionFormData.category,
+                    method: transactionFormData.method,
+                    pocketId: transactionFormData.pocketId,
+                    projectId: transactionFormData.projectId
+                };
+
+                const createdTransaction = await SupabaseService.createTransaction(newTransaction);
+                setTransactions(prev => [...prev, createdTransaction].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+
+                // Update pocket balance if applicable
+                if (createdTransaction.pocketId) {
+                    const targetPocket = pockets.find(p => p.id === createdTransaction.pocketId);
+                    if (targetPocket) {
+                        const updatedAmount = targetPocket.amount + (createdTransaction.type === TransactionType.INCOME ? createdTransaction.amount : -createdTransaction.amount);
+                        const updatedPocket = await SupabaseService.updateFinancialPocket(createdTransaction.pocketId, { amount: updatedAmount });
+                        setPockets(prev => prev.map(p => p.id === createdTransaction.pocketId ? updatedPocket : p));
+                    }
+                }
+
+            } else if (transactionModalMode === 'edit' && selectedTransaction) {
+                const updatedTransaction = await SupabaseService.updateTransaction(selectedTransaction.id, {
+                    date: transactionFormData.date,
+                    description: transactionFormData.description,
+                    amount: transactionFormData.amount,
+                    type: transactionFormData.type as TransactionType,
+                    category: transactionFormData.category,
+                    method: transactionFormData.method,
+                    pocketId: transactionFormData.pocketId,
+                    projectId: transactionFormData.projectId
+                });
+
+                setTransactions(prev => prev.map(t => t.id === selectedTransaction.id ? updatedTransaction : t));
+
+            }
+        } catch (error) {
+            console.error('Error saving transaction:', error);
+            alert('Terjadi kesalahan saat menyimpan transaksi. Silakan coba lagi.');
         }
 
-        setTransactions(updatedTransactions);
-        setPockets(prevPockets => recalculateExpensePocketTotals(updatedTransactions, prevPockets));
         handleCloseTransactionModal();
     };
 
-    const handleTransactionDelete = (transactionId: string) => {
+    const handleTransactionDelete = async (transactionId: string) => {
         if (window.confirm("Yakin ingin menghapus transaksi ini? Menghapus transaksi transfer akan mempengaruhi saldo kantong Anda.")) {
-            const transactionToDelete = transactions.find(t => t.id === transactionId);
-            if (!transactionToDelete) return;
+            try {
+                const transactionToDelete = transactions.find(t => t.id === transactionId);
+                if (!transactionToDelete) return;
 
-            let updatedTransactions = transactions.filter(t => t.id !== transactionId);
-            let updatedPockets = [...pockets];
-            
-            if (transactionToDelete.pocketId && transactionToDelete.category === 'Transfer Antar Kantong') {
-                const pocketToUpdate = updatedPockets.find(p => p.id === transactionToDelete.pocketId);
-                
-                if (pocketToUpdate && pocketToUpdate.type !== PocketType.EXPENSE) {
-                     updatedPockets = updatedPockets.map(p => {
-                        if (p.id === pocketToUpdate.id) {
-                            let newAmount = p.amount;
-                            if (transactionToDelete.type === TransactionType.INCOME) { // Reverse of topup is income
-                                newAmount -= transactionToDelete.amount;
-                            } else { // Reverse of withdraw is expense
-                                newAmount += transactionToDelete.amount;
+                await SupabaseService.deleteTransaction(transactionId);
+                let updatedTransactions = transactions.filter(t => t.id !== transactionId);
+                let updatedPockets = [...pockets];
+
+                if (transactionToDelete.pocketId && transactionToDelete.category === 'Transfer Antar Kantong') {
+                    const pocketToUpdate = updatedPockets.find(p => p.id === transactionToDelete.pocketId);
+
+                    if (pocketToUpdate && pocketToUpdate.type !== PocketType.EXPENSE) {
+                        updatedPockets = updatedPockets.map(p => {
+                            if (p.id === pocketToUpdate.id) {
+                                let newAmount = p.amount;
+                                if (transactionToDelete.type === TransactionType.INCOME) { // Reverse of topup is income
+                                    newAmount -= transactionToDelete.amount;
+                                } else { // Reverse of withdraw is expense
+                                    newAmount += transactionToDelete.amount;
+                                }
+                                return { ...p, amount: newAmount < 0 ? 0 : newAmount };
                             }
-                            return { ...p, amount: newAmount < 0 ? 0 : newAmount };
-                        }
-                        return p;
-                    });
+                            return p;
+                        });
+                    }
+                     if (pocketToUpdate){
+                         await SupabaseService.updateFinancialPocket(pocketToUpdate.id, {amount: pocketToUpdate.amount})
+                     }
                 }
+
+                const finalPockets = recalculateExpensePocketTotals(updatedTransactions, updatedPockets);
+
+                setTransactions(updatedTransactions);
+                setPockets(finalPockets);
             }
-            
-            const finalPockets = recalculateExpensePocketTotals(updatedTransactions, updatedPockets);
-            
-            setTransactions(updatedTransactions);
-            setPockets(finalPockets);
+             catch (error) {
+                console.error('Error deleting transaction:', error);
+                alert('Terjadi kesalahan saat menghapus transaksi. Silakan coba lagi.');
+            }
         }
     };
-    
+
     const handleFilterChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
         setFilters(prev => ({...prev, [name]: value}));
@@ -721,12 +762,12 @@ const Finance: React.FC<FinanceProps> = ({ transactions, setTransactions, pocket
         setActiveExpenseCategory(category);
         setActiveIncomeCategory('all');
     };
-    
+
     const handleSelectIncomeCategory = (category: string) => {
         setActiveIncomeCategory(category);
         setActiveExpenseCategory('all');
     };
-    
+
     const handleClearCategoryFilters = () => {
         setActiveIncomeCategory('all');
         setActiveExpenseCategory('all');
@@ -755,17 +796,17 @@ const Finance: React.FC<FinanceProps> = ({ transactions, setTransactions, pocket
         setPocketFormData(newFormData);
     };
 
-    const handlePocketFormSubmit = (e: React.FormEvent) => {
+    const handlePocketFormSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        try{
         if (pocketModalMode === 'add') {
-            const newPocketId = `POC${Date.now()}`;
-            const newPocket: FinancialPocket = { ...pocketFormData, id: newPocketId };
-            
+            const newPocket: FinancialPocket = { ...pocketFormData, id: `POC${Date.now()}` };
+
             if(newPocket.type === PocketType.EXPENSE) {
                 newPocket.amount = 0;
             }
-
-            setPockets(prev => [...prev, newPocket]);
+             const createdPocket = await SupabaseService.createFinancialPocket(newPocket);
+            setPockets(prev => [...prev, createdPocket]);
 
             if (newPocket.amount > 0 && newPocket.type !== PocketType.EXPENSE) {
                  const transferTransaction: Transaction = {
@@ -777,20 +818,37 @@ const Finance: React.FC<FinanceProps> = ({ transactions, setTransactions, pocket
                     category: 'Transfer Antar Kantong',
                     method: 'Transfer Bank',
                     pocketId: newPocket.id,
+                    projectId: undefined
                 };
-                setTransactions(prev => [transferTransaction, ...prev].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+                 const createdTransaction = await SupabaseService.createTransaction(transferTransaction);
+                setTransactions(prev => [createdTransaction, ...prev].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
             }
 
         } else if (pocketModalMode === 'edit' && selectedPocket) {
+            const updatedPocket = await SupabaseService.updateFinancialPocket(selectedPocket.id, {
+                name: pocketFormData.name,
+                description: pocketFormData.description,
+                icon: pocketFormData.icon,
+                type: pocketFormData.type,
+                amount: pocketFormData.amount,
+                goalAmount: pocketFormData.goalAmount,
+                lockEndDate: pocketFormData.lockEndDate
+            });
             setPockets(prev => prev.map(p => p.id === selectedPocket.id ? { ...selectedPocket, ...pocketFormData } : p));
         }
+    }
+    catch (error) {
+             console.error('Error saving pocket:', error);
+            alert('Terjadi kesalahan saat menyimpan kantong keuangan. Silakan coba lagi.');
+         }
         handleClosePocketModal();
     };
 
-    const handlePocketDelete = (pocketToDelete: FinancialPocket) => {
+    const handlePocketDelete = async (pocketToDelete: FinancialPocket) => {
         if (window.confirm(`Yakin ingin menghapus kantong "${pocketToDelete.name}"? Saldo akan dikembalikan ke Saldo Utama dan riwayat transfer terkait akan dihapus.`)) {
+            try{
             let newTransactions = [...transactions];
-            
+
             if (pocketToDelete.type === PocketType.SAVING || pocketToDelete.type === PocketType.LOCKED) {
                 if (pocketToDelete.amount > 0) {
                     const closingTransaction: Transaction = {
@@ -801,15 +859,18 @@ const Finance: React.FC<FinanceProps> = ({ transactions, setTransactions, pocket
                         type: TransactionType.INCOME,
                         category: 'Transfer Antar Kantong',
                         method: 'Transfer Bank',
+                        pocketId: undefined,
+                        projectId: undefined
                     };
-                    newTransactions.push(closingTransaction);
+                     const createdTransaction = await SupabaseService.createTransaction(closingTransaction);
+                    newTransactions.push(createdTransaction);
                 }
-                
-                newTransactions = newTransactions.filter(t => 
+
+                newTransactions = newTransactions.filter(t =>
                     !(t.pocketId === pocketToDelete.id && t.category === 'Transfer Antar Kantong')
                 );
 
-            } 
+            }
             else if (pocketToDelete.type === PocketType.EXPENSE) {
                 newTransactions = newTransactions.map(t => {
                     if (t.pocketId === pocketToDelete.id) {
@@ -819,22 +880,28 @@ const Finance: React.FC<FinanceProps> = ({ transactions, setTransactions, pocket
                     return t;
                 });
             }
-
+            await SupabaseService.deleteFinancialPocket(pocketToDelete.id);
             const updatedPockets = pockets.filter(p => p.id !== pocketToDelete.id);
-            setTransactions(newTransactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
-            setPockets(updatedPockets);
+
+             setTransactions(newTransactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+              setPockets(updatedPockets);
+        }
+        catch (error) {
+             console.error('Error deleting pocket:', error);
+                alert('Terjadi kesalahan saat menghapus kantong keuangan. Silakan coba lagi.');
+            }
         }
     };
-    
-    const handleManagePocket = (action: 'topup' | 'withdraw') => {
+
+    const handleManagePocket = async (action: 'topup' | 'withdraw') => {
         const amount = Number(manageAmount);
         if (selectedPocket && amount > 0) {
-            
+
             if (action === 'withdraw' && amount > selectedPocket.amount) {
                 alert('Saldo kantong tidak mencukupi untuk penarikan.');
                 return;
             }
-            
+
             const newTransaction: Transaction = {
                 id: `TRN-MNG-${selectedPocket.id}-${Date.now()}`,
                 date: new Date().toISOString().split('T')[0],
@@ -844,13 +911,16 @@ const Finance: React.FC<FinanceProps> = ({ transactions, setTransactions, pocket
                 category: 'Transfer Antar Kantong',
                 method: 'Transfer Bank',
                 pocketId: selectedPocket.id,
+                projectId: undefined
             };
+             const createdTransaction = await SupabaseService.createTransaction(newTransaction);
+            setTransactions(prev => [createdTransaction, ...prev].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
 
-            setTransactions(prev => [newTransaction, ...prev].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
-
+             const newAmount = action === 'topup' ? selectedPocket.amount + amount : selectedPocket.amount - amount;
+            const updatedPocket = await SupabaseService.updateFinancialPocket(selectedPocket.id, {amount: newAmount})
             setPockets(prev => prev.map(p => {
                 if (p.id === selectedPocket.id) {
-                    const newAmount = action === 'topup' ? p.amount + amount : p.amount - amount;
+
                     return { ...p, amount: newAmount };
                 }
                 return p;
@@ -868,9 +938,9 @@ const Finance: React.FC<FinanceProps> = ({ transactions, setTransactions, pocket
         setIsCloseBudgetModalOpen(true);
     };
 
-    const handleConfirmCloseBudget = () => {
+    const handleConfirmCloseBudget = async () => {
         if (!monthlyBudgetPocketContext || !destinationPocketId) return;
-        
+
         const { remaining } = monthlyBudgetPocketContext;
         const destinationPocket = pockets.find(p => p.id === destinationPocketId);
 
@@ -879,7 +949,7 @@ const Finance: React.FC<FinanceProps> = ({ transactions, setTransactions, pocket
             setIsCloseBudgetModalOpen(false);
             return;
         }
-        
+
         const finalTransferTransaction: Transaction = {
              id: `TRN-CLOSE-${Date.now()}`,
             date: new Date().toISOString().split('T')[0],
@@ -889,16 +959,17 @@ const Finance: React.FC<FinanceProps> = ({ transactions, setTransactions, pocket
             category: 'Transfer Antar Kantong',
             method: 'Sistem',
             pocketId: monthlyBudgetPocketContext.pocket.id, // Expense is against the budget pocket
+            projectId: undefined
         }
-        
-        let newTransactions = [...transactions, finalTransferTransaction];
-        
-        const newPockets = pockets.map(p => 
-            p.id === destinationPocketId ? { ...p, amount: p.amount + remaining } : p
+         const createdTransaction = await SupabaseService.createTransaction(finalTransferTransaction);
+        let newTransactions = [...transactions, createdTransaction];
+           const updatedDestinationPocket = await SupabaseService.updateFinancialPocket(destinationPocketId, {amount: destinationPocket.amount + remaining})
+        const newPockets = pockets.map(p =>
+            p.id === destinationPocketId ? { ...p, amount: destinationPocket.amount + remaining } : p
         );
 
         const finalPockets = recalculateExpensePocketTotals(newTransactions, newPockets);
-        
+
         setTransactions(newTransactions.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
         setPockets(finalPockets);
         setIsCloseBudgetModalOpen(false);
@@ -946,7 +1017,7 @@ const Finance: React.FC<FinanceProps> = ({ transactions, setTransactions, pocket
         });
         const chartData = Array.from(dailyData.entries()).map(([date, values]) => ({ date, ...values })).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
         setReportChartData(chartData);
-        
+
         // Client profitability
         const projectClientMap = projects.reduce((acc, p) => { if(p.clientId) acc[p.id] = {clientName: p.clientName}; return acc; }, {} as Record<string, {clientName: string}>);
         const clientProfitMap = new Map<string, { name: string, profit: number }>();
@@ -976,10 +1047,10 @@ const Finance: React.FC<FinanceProps> = ({ transactions, setTransactions, pocket
             profitableProjects
         });
     }, [reportDateRange, transactions, projects, activeTab]);
-    
+
     const cashflowAnalysis = useMemo(() => {
         if (activeTab !== 'cashflow' || !cashflowDate) return null;
-        
+
         let periodStart: Date, periodEnd: Date;
         let chartData: { label: string; income: number; expense: number; balance: number }[] = [];
 
@@ -997,22 +1068,22 @@ const Finance: React.FC<FinanceProps> = ({ transactions, setTransactions, pocket
 
         const transactionsBeforePeriod = transactions.filter(t => new Date(t.date) < periodStart);
         const beginningBalance = transactionsBeforePeriod.reduce((acc, t) => acc + (t.type === TransactionType.INCOME ? t.amount : -t.amount), 0);
-        
+
         let currentBalance = beginningBalance;
         if (cashflowPeriod === 'yearly') {
             chartData = Array.from({ length: 12 }).map((_, i) => {
                 const monthStart = new Date(periodStart.getFullYear(), i, 1);
                 const monthEnd = new Date(periodStart.getFullYear(), i + 1, 0, 23, 59, 59, 999);
-                
+
                 const monthlyTransactions = transactions.filter(t => {
                     const tDate = new Date(t.date);
                     return tDate >= monthStart && tDate <= monthEnd;
                 });
-                
+
                 const monthlyIncome = monthlyTransactions.filter(t => t.type === TransactionType.INCOME).reduce((s, t) => s + t.amount, 0);
                 const monthlyExpense = monthlyTransactions.filter(t => t.type === TransactionType.EXPENSE).reduce((s, t) => s + t.amount, 0);
                 currentBalance += (monthlyIncome - monthlyExpense);
-                
+
                 return {
                     label: monthStart.toLocaleString('id-ID', { month: 'short' }),
                     income: monthlyIncome,
@@ -1034,12 +1105,12 @@ const Finance: React.FC<FinanceProps> = ({ transactions, setTransactions, pocket
                 return { label: day.toString(), income: dailyIncome, expense: dailyExpense, balance: currentBalance };
             });
         }
-        
+
         const income = chartData.reduce((sum, d) => sum + d.income, 0);
         const expense = chartData.reduce((sum, d) => sum + d.expense, 0);
         const netCashflow = income - expense;
         const endingBalance = beginningBalance + netCashflow;
-        
+
         const transactionsInPeriod = transactions.filter(t => { const tDate = new Date(t.date); return tDate >= periodStart && tDate <= periodEnd; });
         const incomeSources = transactionsInPeriod.filter(t => t.type === TransactionType.INCOME).reduce((acc, t) => { acc[t.category] = (acc[t.category] || 0) + t.amount; return acc; }, {} as Record<string, number>);
         const expenseCategories = transactionsInPeriod.filter(t => t.type === TransactionType.EXPENSE).reduce((acc, t) => { acc[t.category] = (acc[t.category] || 0) + t.amount; return acc; }, {} as Record<string, number>);
@@ -1049,13 +1120,13 @@ const Finance: React.FC<FinanceProps> = ({ transactions, setTransactions, pocket
         threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
         const last3MonthsExpense = transactions.filter(t => t.type === TransactionType.EXPENSE && new Date(t.date) >= threeMonthsAgo).reduce((sum, t) => sum + t.amount, 0);
         const avgMonthlyBurn = last3MonthsExpense > 0 ? last3MonthsExpense / 3 : 5000000;
-        
+
         const projections = Array.from({ length: 3 }).map((_, i) => {
             const projectionMonth = new Date();
             projectionMonth.setMonth(projectionMonth.getMonth() + 1 + i, 1);
             const monthStr = projectionMonth.toLocaleString('id-ID', { month: 'long', year: 'numeric' });
-            
-            const projectedIncome = projects.filter(p => (p.status === ProjectStatus.CONFIRMED || p.status === ProjectStatus.PREPARATION) && new Date(p.date).getFullYear() === projectionMonth.getFullYear() && new Date(p.date).getMonth() === projectionMonth.getMonth()).reduce((sum, p) => sum + (p.totalCost - p.amountPaid), 0);
+
+            const projectedIncome = projects.filter(p => (p.status === ProjectStatus.CONFIRMED ||p.status === ProjectStatus.PREPARATION) && new Date(p.date).getFullYear() === projectionMonth.getFullYear() && new Date(p.date).getMonth() === projectionMonth.getMonth()).reduce((sum, p) => sum + (p.totalCost - p.amountPaid), 0);
             return { month: monthStr, income: projectedIncome, expense: avgMonthlyBurn };
         });
 
@@ -1072,7 +1143,7 @@ const Finance: React.FC<FinanceProps> = ({ transactions, setTransactions, pocket
                    projectDate.getFullYear() === year &&
                    projectDate.getMonth() === targetMonth;
         });
-        
+
         if (completedProjectsInMonth.length === 0) {
             return { summary: { income: 0, expense: 0, net: 0 }, details: [] };
         }
@@ -1125,7 +1196,7 @@ const Finance: React.FC<FinanceProps> = ({ transactions, setTransactions, pocket
         });
 
         const headers = ["Tanggal", "Deskripsi", "Kategori", "Proyek", "Jenis", "Jumlah", "Metode", "Kantong Anggaran"];
-        
+
         const csvRows = [
             headers.join(','),
             ...reportTransactions.map(row => {
@@ -1147,7 +1218,7 @@ const Finance: React.FC<FinanceProps> = ({ transactions, setTransactions, pocket
         csvRows.push(`"Total Pemasukan",${reportSummary.income}`);
         csvRows.push(`"Total Pengeluaran",${reportSummary.expense}`);
         csvRows.push(`"Laba/Rugi Bersih",${reportSummary.net}`);
-        
+
         const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -1170,12 +1241,12 @@ const Finance: React.FC<FinanceProps> = ({ transactions, setTransactions, pocket
 
         details.forEach(p => {
             csvRows.push(`"${p.name.replace(/"/g, '""')}","","","",""`);
-            
+
             const allTransactions = [
                 ...p.incomeTransactions.map(t => ({...t, type: 'income'})),
                 ...p.expenseTransactions.map(t => ({...t, type: 'expense'}))
             ].sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-            
+
             allTransactions.forEach(t => {
                 csvRows.push([
                     "",
@@ -1185,7 +1256,7 @@ const Finance: React.FC<FinanceProps> = ({ transactions, setTransactions, pocket
                     t.type === 'expense' ? t.amount : 0
                 ].join(','));
             });
-            
+
             csvRows.push([
                 `"Total ${p.name.replace(/"/g, '""')}"`,
                 "",
@@ -1196,7 +1267,7 @@ const Finance: React.FC<FinanceProps> = ({ transactions, setTransactions, pocket
 
             csvRows.push("");
         });
-        
+
         csvRows.push("");
         csvRows.push(`"TOTAL KESELURUHAN", "", "Laba/Rugi Bersih: ${formatCurrency(summary.net)}", ${summary.income}, ${summary.expense}`);
 
@@ -1210,7 +1281,7 @@ const Finance: React.FC<FinanceProps> = ({ transactions, setTransactions, pocket
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
     };
-    
+
     const getComparisonChip = (current: number, previous: number) => {
         if (previous === 0) {
             return current > 0 ? <span className="text-xs font-medium text-emerald-600 ml-2">(Baru)</span> : <span className="text-xs font-medium text-slate-500 ml-2">(-.--)</span>;
@@ -1246,7 +1317,7 @@ const Finance: React.FC<FinanceProps> = ({ transactions, setTransactions, pocket
             setCashflowDate(now.getFullYear().toString());
         }
     };
-    
+
     const renderContent = () => {
         switch (activeTab) {
             case 'transactions':
@@ -1286,7 +1357,7 @@ const Finance: React.FC<FinanceProps> = ({ transactions, setTransactions, pocket
                 )
             case 'cashflow':
                 return (
-                    <CashflowView 
+                    <CashflowView
                         analysis={cashflowAnalysis}
                         period={cashflowPeriod}
                         date={cashflowDate}
@@ -1298,7 +1369,7 @@ const Finance: React.FC<FinanceProps> = ({ transactions, setTransactions, pocket
                 );
             case 'reports':
                 return (
-                    <ReportsView 
+                    <ReportsView
                         reportDateRange={reportDateRange}
                         setReportDateRange={setReportDateRange}
                         handleDownloadCsv={handleDownloadCsv}
@@ -1330,7 +1401,7 @@ const Finance: React.FC<FinanceProps> = ({ transactions, setTransactions, pocket
                     </button>
                 )}
             </PageHeader>
-           
+
             <div className="border-b border-slate-200">
                 <nav className="-mb-px flex space-x-8" aria-label="Tabs">
                     <button type="button" onClick={() => setActiveTab('transactions')} className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'transactions' ? 'border-slate-700 text-slate-800' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'}`}>Transaksi</button>
@@ -1401,7 +1472,7 @@ const Finance: React.FC<FinanceProps> = ({ transactions, setTransactions, pocket
                     </div>
                 </form>
             </Modal>
-            
+
             <Modal isOpen={isPocketModalOpen} onClose={handleClosePocketModal} title={pocketModalMode === 'add' ? 'Buat Kantong Baru' : pocketModalMode === 'edit' ? 'Edit Kantong' : `Kelola: ${selectedPocket?.name}`}>
                 {pocketModalMode === 'manage' && selectedPocket ? (
                      <div className="space-y-4">

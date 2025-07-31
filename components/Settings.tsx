@@ -1,8 +1,6 @@
-
-
-
 import React, { useState } from 'react';
 import { Profile, Transaction, Project, User } from '../types';
+import { SupabaseService } from '../services/supabaseService';
 import PageHeader from './PageHeader';
 import Modal from './Modal';
 import { PencilIcon, PlusIcon, Trash2Icon, KeyIcon, UsersIcon, ListIcon } from '../constants';
@@ -34,7 +32,7 @@ const CategoryManager: React.FC<{
     onCancelEdit: () => void;
     placeholder: string;
 }> = ({ title, categories, inputValue, onInputChange, onAddOrUpdate, onEdit, onDelete, editingValue, onCancelEdit, placeholder }) => {
-    
+
     const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
         if (e.key === 'Enter') {
             e.preventDefault();
@@ -100,7 +98,7 @@ const Settings: React.FC<SettingsProps> = ({ profile, setProfile, transactions, 
     const [editingProjectType, setEditingProjectType] = useState<string | null>(null);
     const [eventTypeInput, setEventTypeInput] = useState('');
     const [editingEventType, setEditingEventType] = useState<string | null>(null);
-    
+
     // State for user management
     const [isUserModalOpen, setIsUserModalOpen] = useState(false);
     const [userModalMode, setUserModalMode] = useState<'add' | 'edit'>('add');
@@ -129,7 +127,7 @@ const Settings: React.FC<SettingsProps> = ({ profile, setProfile, transactions, 
         setShowSuccess(true);
         setTimeout(() => setShowSuccess(false), 2000);
     }
-    
+
     // --- User Management Handlers ---
     const handleOpenUserModal = (mode: 'add' | 'edit', user: User | null = null) => {
         setUserModalMode(mode);
@@ -160,7 +158,7 @@ const Settings: React.FC<SettingsProps> = ({ profile, setProfile, transactions, 
         const { name, value } = e.target;
         setUserForm(prev => ({ ...prev, [name]: value }));
     };
-    
+
     const handleUserFormSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         setUserFormError('');
@@ -220,7 +218,7 @@ const Settings: React.FC<SettingsProps> = ({ profile, setProfile, transactions, 
             setUsers(prev => prev.filter(u => u.id !== userId));
         }
     };
-    
+
     // --- Category Management Handlers ---
     const handleAddOrUpdateIncomeCategory = () => {
         if (!incomeCategoryInput.trim()) return;
@@ -252,7 +250,7 @@ const Settings: React.FC<SettingsProps> = ({ profile, setProfile, transactions, 
             setProfile(prev => ({ ...prev, incomeCategories: (prev.incomeCategories || []).filter(c => c !== category) }));
         }
     };
-    
+
     const handleAddOrUpdateExpenseCategory = () => {
         if (!expenseCategoryInput.trim()) return;
         const newCategory = expenseCategoryInput.trim();
@@ -271,7 +269,7 @@ const Settings: React.FC<SettingsProps> = ({ profile, setProfile, transactions, 
         }
         setExpenseCategoryInput('');
     };
-    
+
     const handleEditExpenseCategory = (category: string) => { setEditingExpenseCategory(category); setExpenseCategoryInput(category); };
     const handleDeleteExpenseCategory = (category: string) => {
         const isCategoryInUse = transactions.some(t => t.category === category && t.type === 'Pengeluaran');
@@ -341,7 +339,7 @@ const Settings: React.FC<SettingsProps> = ({ profile, setProfile, transactions, 
             setProfile(prev => ({ ...prev, eventTypes: (prev.eventTypes || []).filter(t => t !== type) }));
         }
     };
-    
+
     const tabs = [
         { id: 'profile', label: 'Profil Saya', icon: UsersIcon },
         { id: 'users', label: 'Pengguna', icon: KeyIcon, adminOnly: true },
@@ -462,7 +460,18 @@ const Settings: React.FC<SettingsProps> = ({ profile, setProfile, transactions, 
                 return null;
         }
     };
-    
+
+    const handleSave = async () => {
+        try {
+            const updatedProfile = await SupabaseService.updateProfile(profile);
+            setProfile(updatedProfile);
+            setShowSuccess(true);
+        } catch (error) {
+            console.error('Error saving profile:', error);
+            alert('Terjadi kesalahan saat menyimpan pengaturan. Silakan coba lagi.');
+        }
+    };
+
     return (
         <div>
             <PageHeader title="Pengaturan" subtitle="Kelola profil, pengguna, dan preferensi aplikasi Anda." />
@@ -491,7 +500,7 @@ const Settings: React.FC<SettingsProps> = ({ profile, setProfile, transactions, 
                     </div>
                 </main>
             </div>
-            
+
             <Modal isOpen={isUserModalOpen} onClose={handleCloseUserModal} title={userModalMode === 'add' ? 'Tambah Pengguna Baru' : 'Edit Pengguna'}>
                 <form onSubmit={handleUserFormSubmit} className="space-y-4">
                     {userFormError && <p className="text-red-600 text-sm bg-red-100 p-3 rounded-md">{userFormError}</p>}

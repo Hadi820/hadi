@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { Project, Client, Transaction, TransactionType, ProjectStatus, ViewType, FinancialPocket, Package, PocketType, Lead, LeadStatus } from '../types';
 import { NavigationAction } from '../App';
+import { SupabaseService } from '../services/supabaseService';
 import PageHeader from './PageHeader';
 import StatCard from './StatCard';
 import { DollarSignIcon, FolderKanbanIcon, UsersIcon, AlertCircleIcon, CalendarIcon, StarIcon, PiggyBankIcon, PieChartIcon, TagIcon, LightbulbIcon, TargetIcon } from '../constants';

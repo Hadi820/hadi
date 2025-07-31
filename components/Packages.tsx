@@ -1,9 +1,8 @@
-
-
 import React, { useState } from 'react';
 import { Package, AddOn, Project } from '../types';
 import PageHeader from './PageHeader';
 import { PencilIcon, Trash2Icon } from '../constants';
+import { SupabaseService } from '../services/supabaseService';
 
 const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(amount);
@@ -47,7 +46,7 @@ const Packages: React.FC<PackagesProps> = ({ packages, setPackages, addOns, setA
     });
   }
 
-  const handlePackageDelete = (pkgId: string) => {
+  const handlePackageDelete = async (pkgId: string) => {
     // Check if the package is being used by any project
     const isPackageInUse = projects.some(p => p.packageId === pkgId);
     if (isPackageInUse) {
@@ -56,11 +55,17 @@ const Packages: React.FC<PackagesProps> = ({ packages, setPackages, addOns, setA
     }
 
     if (window.confirm("Apakah Anda yakin ingin menghapus paket ini?")) {
-        setPackages(prev => prev.filter(p => p.id !== pkgId));
+        try {
+            await SupabaseService.deletePackage(pkgId);
+            setPackages(prev => prev.filter(p => p.id !== pkgId));
+        } catch (error) {
+            console.error('Error deleting package:', error);
+            alert('Terjadi kesalahan saat menghapus paket layanan. Silakan coba lagi.');
+        }
     }
   }
 
-  const handlePackageSubmit = (e: React.FormEvent) => {
+  const handlePackageSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!packageFormData.name || !packageFormData.price) {
         alert('Nama Paket dan Harga tidak boleh kosong.');
@@ -72,12 +77,18 @@ const Packages: React.FC<PackagesProps> = ({ packages, setPackages, addOns, setA
         price: Number(packageFormData.price),
         description: packageFormData.description,
     };
-    
-    if (packageEditMode) {
-        setPackages(prev => prev.map(p => p.id === packageEditMode ? { ...p, ...packageData } : p));
-    } else {
-        const newPackage: Package = { ...packageData, id: `PKG${Date.now()}` };
-        setPackages(prev => [...prev, newPackage]);
+
+    try {
+        if (packageEditMode) {
+            const updatedPackage = await SupabaseService.updatePackage(packageEditMode, packageData);
+            setPackages(prev => prev.map(p => p.id === packageEditMode ? updatedPackage : p));
+        } else {
+            const newPackage = await SupabaseService.createPackage(packageData);
+            setPackages(prev => [...prev, newPackage]);
+        }
+    } catch (error) {
+        console.error('Error saving package:', error);
+        alert('Terjadi kesalahan saat menyimpan paket layanan. Silakan coba lagi.');
     }
 
     handlePackageCancelEdit();
@@ -102,7 +113,7 @@ const Packages: React.FC<PackagesProps> = ({ packages, setPackages, addOns, setA
     });
   }
 
-  const handleAddOnDelete = (addOnId: string) => {
+  const handleAddOnDelete = async (addOnId: string) => {
     // Check if the add-on is being used by any project
     const isAddOnInUse = projects.some(p => p.addOns.some(a => a.id === addOnId));
     if (isAddOnInUse) {
@@ -111,11 +122,17 @@ const Packages: React.FC<PackagesProps> = ({ packages, setPackages, addOns, setA
     }
 
     if (window.confirm("Apakah Anda yakin ingin menghapus add-on ini?")) {
-        setAddOns(prev => prev.filter(a => a.id !== addOnId));
+        try {
+            await SupabaseService.deleteAddOn(addOnId);
+            setAddOns(prev => prev.filter(a => a.id !== addOnId));
+        } catch (error) {
+            console.error('Error deleting add-on:', error);
+            alert('Terjadi kesalahan saat menghapus add-on. Silakan coba lagi.');
+        }
     }
   }
 
-  const handleAddOnSubmit = (e: React.FormEvent) => {
+  const handleAddOnSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!addOnFormData.name || !addOnFormData.price) {
         alert('Nama Add-On dan Harga tidak boleh kosong.');
@@ -126,12 +143,18 @@ const Packages: React.FC<PackagesProps> = ({ packages, setPackages, addOns, setA
         name: addOnFormData.name,
         price: Number(addOnFormData.price),
     };
-    
-    if (addOnEditMode) {
-        setAddOns(prev => prev.map(a => a.id === addOnEditMode ? { ...a, ...addOnData } : a));
-    } else {
-        const newAddOn: AddOn = { ...addOnData, id: `ADD${Date.now()}` };
-        setAddOns(prev => [...prev, newAddOn]);
+
+    try {
+        if (addOnEditMode) {
+            const updatedAddOn = await SupabaseService.updateAddOn(addOnEditMode, addOnData);
+            setAddOns(prev => prev.map(a => a.id === addOnEditMode ? updatedAddOn : a));
+        } else {
+            const newAddOn = await SupabaseService.createAddOn(addOnData);
+            setAddOns(prev => [...prev, newAddOn]);
+        }
+    } catch (error) {
+        console.error('Error saving add-on:', error);
+        alert('Terjadi kesalahan saat menyimpan add-on. Silakan coba lagi.');
     }
 
     handleAddOnCancelEdit();
@@ -142,11 +165,11 @@ const Packages: React.FC<PackagesProps> = ({ packages, setPackages, addOns, setA
     <div>
       <PageHeader title="Manajemen Paket & Add-On" subtitle="Kelola paket layanan dan item tambahan untuk klien Anda." />
       <div className="grid lg:grid-cols-2 gap-8 items-start">
-        
+
         {/* === Left Column: PACKAGES === */}
         <div className="bg-white p-6 rounded-xl shadow-sm h-fit space-y-6">
             <h3 className="text-xl font-semibold text-slate-800 border-b pb-3">Paket Layanan</h3>
-            
+
             {/* Package Form */}
             <div>
               <h4 className="text-lg font-semibold text-slate-700 mb-4">{packageEditMode ? 'Edit Paket' : 'Tambah Paket Baru'}</h4>
@@ -173,7 +196,7 @@ const Packages: React.FC<PackagesProps> = ({ packages, setPackages, addOns, setA
                   </div>
               </form>
             </div>
-            
+
             <hr/>
 
             {/* Package List */}
@@ -252,3 +275,4 @@ const Packages: React.FC<PackagesProps> = ({ packages, setPackages, addOns, setA
 };
 
 export default Packages;
+```

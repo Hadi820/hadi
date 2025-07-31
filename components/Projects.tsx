@@ -1,8 +1,7 @@
-
-
 import React, { useState, useMemo, useEffect } from 'react';
-import { Project, ProjectStatus, PaymentStatus, TeamMember, Client, Package, TeamProjectPayment, Transaction, TransactionType, AssignedTeamMember, Profile } from '../types';
+import { Project, Client, Package, AddOn, PaymentStatus, ProjectStatus, TransactionType, Transaction, Profile, TeamMember, AssignedTeamMember } from '../types';
 import { NavigationAction } from '../App';
+import { SupabaseService } from '../services/supabaseService';
 import PageHeader from './PageHeader';
 import Modal from './Modal';
 import { EyeIcon, PlusIcon, PencilIcon, Trash2Icon, ListIcon, LayoutGridIcon, getProjectStatusColor } from '../constants';
@@ -220,7 +219,7 @@ const Projects: React.FC<ProjectsProps> = ({ projects, setProjects, clients, pac
             .filter(p => viewMode === 'kanban' || statusFilter === 'all' || p.status === statusFilter)
             .filter(p => p.projectName.toLowerCase().includes(searchTerm.toLowerCase()) || p.clientName.toLowerCase().includes(searchTerm.toLowerCase()));
     }, [projects, searchTerm, statusFilter, viewMode]);
-    
+
     const summary = useMemo(() => ({
         total: projects.length,
         completed: projects.filter(p => p.status === ProjectStatus.COMPLETED).length,
@@ -285,7 +284,7 @@ const Projects: React.FC<ProjectsProps> = ({ projects, setProjects, clients, pac
             }
         });
     };
-    
+
     const handleTeamFeeChange = (memberId: string, newFee: number) => {
         setFormData(prev => ({
             ...prev,
@@ -300,65 +299,96 @@ const Projects: React.FC<ProjectsProps> = ({ projects, setProjects, clients, pac
         }));
     };
 
-    const handleFormSubmit = (e: React.FormEvent) => {
+    const handleFormSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        
-        let projectData: Project;
 
-        if (formMode === 'add') {
-             projectData = {
-                ...initialFormState,
-                ...formData,
-                id: `PRJ${Date.now()}`,
-                progress: 0,
-                totalCost: 0, // Will be set on client page
-                amountPaid: 0,
-                paymentStatus: PaymentStatus.BELUM_BAYAR,
-                packageId: '',
-                addOns: [],
-            };
-        } else { // edit mode
-            const originalProject = projects.find(p => p.id === formData.id);
-            if (!originalProject) return; 
+        const selectedPackage = packages.find(p => p.id === formData.packageId);
+        const selectedAddOns = packages.length > 0 ? packages[0].addOns : [];
+        const totalCost = (selectedPackage?.price || 0) + selectedAddOns.reduce((sum, addon) => sum + addon.price, 0);
 
-             projectData = {
-                ...originalProject, // Keep financial data
-                ...formData, // Overwrite operational data
-                team: formData.team
-            };
+        try {
+            if (formMode === 'add') {
+                const newProject: Omit<Project, 'id'> = {
+                    projectName: formData.projectName,
+                    clientName: formData.clientName,
+                    clientId: formData.clientId,
+                    projectType: formData.projectType,
+                    packageName: selectedPackage?.name || '',
+                    packageId: selectedPackage?.id || '',
+                    addOns: selectedAddOns,
+                    date: formData.date,
+                    deadlineDate: formData.deadlineDate,
+                    location: formData.location,
+                    progress: 0,
+                    status: formData.status,
+                    totalCost,
+                    amountPaid: 0,
+                    paymentStatus: PaymentStatus.BELUM_BAYAR,
+                    team: formData.team,
+                    notes: formData.notes,
+                    driveLink: formData.driveLink,
+                };
+
+                const createdProject = await SupabaseService.createProject(newProject);
+                setProjects(prev => [createdProject, ...prev].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+
+               
+                showNotification('Proyek baru berhasil ditambahkan.');
+            } else if (formMode === 'edit' && selectedProject) {
+                const projectData: Project = {
+                    ...selectedProject, // Keep financial data
+                    ...formData, // Overwrite operational data
+                    team: formData.team
+                };
+                const updatedProject = await SupabaseService.updateProject(projectData.id, {
+                    projectName: formData.projectName,
+                    clientName: formData.clientName,
+                    clientId: formData.clientId,
+                    projectType: formData.projectType,
+                    packageName: selectedPackage?.name || '',
+                    packageId: selectedPackage?.id || '',
+                    addOns: selectedAddOns,
+                    date: formData.date,
+                    deadlineDate: formData.deadlineDate,
+                    location: formData.location,
+                    progress: 0,
+                    status: formData.status,
+                    totalCost,
+                    amountPaid: 0,
+                    paymentStatus: PaymentStatus.BELUM_BAYAR,
+                    team: formData.team,
+                    notes: formData.notes,
+                    driveLink: formData.driveLink,
+                };
+
+                setProjects(prev => prev.map(p => p.id === updatedProject.id ? updatedProject : p).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+                showNotification('Proyek berhasil diperbarui.');
+            }
+        } catch (error) {
+            console.error('Error saving project:', error);
+            alert('Terjadi kesalahan saat menyimpan proyek. Silakan coba lagi.');
         }
-        
-        // Create payment tracking for ALL team members
-        const allTeamMembersOnProject = projectData.team;
-        const otherProjectPayments = teamProjectPayments.filter(p => p.projectId !== projectData.id);
-        const newProjectPaymentEntries: TeamProjectPayment[] = allTeamMembersOnProject.map(teamMember => ({
-            id: `TPP-${projectData.id}-${teamMember.memberId}`,
-            projectId: projectData.id,
-            teamMemberName: teamMember.name,
-            teamMemberId: teamMember.memberId,
-            date: projectData.date,
-            status: 'Unpaid',
-            fee: teamMember.fee,
-            reward: teamMember.reward || 0,
-        }));
-        setTeamProjectPayments([...otherProjectPayments, ...newProjectPaymentEntries]);
 
-        if (formMode === 'add') {
-            setProjects(prev => [projectData, ...prev].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
-        } else {
-            setProjects(prev => prev.map(p => p.id === projectData.id ? projectData : p).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
-        }
         handleCloseForm();
     };
 
-    const handleProjectDelete = (projectId: string) => {
+    const handleProjectDelete = async (projectId: string) => {
         if (window.confirm("Apakah Anda yakin ingin menghapus proyek ini? Semua data terkait (termasuk tugas tim dan transaksi) akan dihapus.")) {
-            setProjects(prev => prev.filter(p => p.id !== projectId));
-            setTeamProjectPayments(prev => prev.filter(fp => fp.projectId !== projectId));
-            setTransactions(prev => prev.filter(t => t.projectId !== projectId));
+            try {
+                // Delete project
+                await SupabaseService.deleteProject(projectId);
+
+                setProjects(prev => prev.filter(p => p.id !== projectId));
+                setTeamProjectPayments(prev => prev.filter(fp => fp.projectId !== projectId));
+                setTransactions(prev => prev.filter(t => t.projectId !== projectId));
+                showNotification('Proyek berhasil dihapus.');
+            } catch (error) {
+                console.error('Error deleting project:', error);
+                alert('Terjadi kesalahan saat menghapus proyek. Silakan coba lagi.');
+            }
         }
     };
-    
+
     // --- Kanban Drag & Drop Handlers ---
     const getProgressForStatus = (status: ProjectStatus) => {
         switch (status) {
@@ -407,7 +437,7 @@ const Projects: React.FC<ProjectsProps> = ({ projects, setProjects, clients, pac
                     Tambah Proyek
                 </button>
             </PageHeader>
-            
+
             {isFormVisible && (
                 <div className="bg-white p-6 rounded-xl shadow-sm mb-6">
                     <h3 className="text-xl font-semibold text-slate-800 border-b pb-3 mb-6">{formMode === 'add' ? 'Tambah Proyek Baru (Operasional)' : 'Edit Proyek'}</h3>
@@ -486,7 +516,7 @@ const Projects: React.FC<ProjectsProps> = ({ projects, setProjects, clients, pac
                     </form>
                 </div>
             )}
-            
+
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                 <div className="bg-white p-4 rounded-xl shadow-sm"><p className="text-sm text-slate-500">Total Proyek</p><p className="text-2xl font-bold">{summary.total}</p></div>
                 <div className="bg-white p-4 rounded-xl shadow-sm"><p className="text-sm text-slate-500">Proyek Selesai</p><p className="text-2xl font-bold">{summary.completed}</p></div>
@@ -511,7 +541,7 @@ const Projects: React.FC<ProjectsProps> = ({ projects, setProjects, clients, pac
                     </button>
                 </div>
             </div>
-            
+
             {viewMode === 'list' ? (
                 <ProjectListView 
                     projects={filteredProjects}
@@ -540,7 +570,7 @@ const Projects: React.FC<ProjectsProps> = ({ projects, setProjects, clients, pac
                         <p><strong>Tanggal Acara:</strong> {new Date(selectedProject.date).toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
                         <p><strong>Lokasi:</strong> {selectedProject.location}</p>
                         {selectedProject.driveLink && <p><strong>Google Drive:</strong> <a href={selectedProject.driveLink} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">Buka Link</a></p>}
-                        
+
                         <div className="pt-4 mt-4 border-t">
                             <h4 className="font-semibold text-slate-800 mb-2">Paket & Biaya</h4>
                              <p><strong>Paket:</strong> {selectedProject.packageName || 'Belum diatur'}</p>
@@ -555,7 +585,6 @@ const Projects: React.FC<ProjectsProps> = ({ projects, setProjects, clients, pac
                                     <p className={`inline-block px-2 py-1 text-xs font-medium rounded-full ${getPaymentStatusClass(selectedProject.paymentStatus)}`}>{selectedProject.paymentStatus}</p>
                                 </div>
                             </div>
-                        </div>
 
                         <div className="pt-4 mt-4 border-t">
                             <h4 className="font-semibold text-slate-800 mb-2">Tim & Catatan</h4>
