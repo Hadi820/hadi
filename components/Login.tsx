@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { User } from '../types';
+import { SupabaseService } from '../services/supabaseService';
 
 interface LoginProps {
     onLoginSuccess: (user: User) => void;
@@ -12,21 +13,27 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess, users }) => {
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
         setIsLoading(true);
 
-        // Simulate API call
-        setTimeout(() => {
-            const user = users.find(u => u.email === email && u.password === password);
+        try {
+            // Authenticate against Supabase users
+            const allUsers = await SupabaseService.getUsers();
+            const user = allUsers.find(u => u.email === email && u.password === password);
+            
             if (user) {
                 onLoginSuccess(user);
             } else {
                 setError('Email atau kata sandi salah.');
             }
+        } catch (error) {
+            console.error('Login error:', error);
+            setError('Terjadi kesalahan saat login. Silakan coba lagi.');
+        } finally {
             setIsLoading(false);
-        }, 1000);
+        }
     };
 
     return (

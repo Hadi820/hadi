@@ -1,5 +1,3 @@
-
-
 import React from 'react';
 import { ViewType, ProjectStatus, TransactionType, PaymentStatus, PocketType, ClientStatus, LeadStatus, ContactChannel } from './types';
 import type { User, Client, Project, Package, TeamMember, Transaction, FinancialPocket, AddOn, Profile, TeamProjectPayment, TeamPaymentRecord, AssignedTeamMember, Lead, NotificationSettings, SecuritySettings, RewardLedgerEntry } from './types';
@@ -164,7 +162,7 @@ export const NAV_ITEMS = [
 
 // --- Users & Profile ---
 export const MOCK_USERS: User[] = [
-    { id: 'USR_ADMIN', email: 'admin@venapictures.com', password: 'password123', fullName: 'Admin Vena', role: 'Admin' }
+    { id: '40ef4507-b94f-45fd-b58d-83d71bb77381', email: 'admin@venapictures.com', password: 'password123', fullName: 'Admin Vena', role: 'Admin' }
 ];
 
 export const MOCK_USER_PROFILE: Profile = {

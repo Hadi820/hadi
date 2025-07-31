@@ -1,4 +1,3 @@
-
 -- ===================================
 -- DATABASE SETUP FOR SUPABASE
 -- ===================================
@@ -171,7 +170,7 @@ CREATE TABLE IF NOT EXISTS profile (
 
 -- Insert Users
 INSERT INTO users (id, email, password, full_name, role) VALUES
-('USR001', 'admin@perusahaan.com', 'password123', 'Admin Utama', 'Admin'),
+('40ef4507-b94f-45fd-b58d-83d71bb77381', 'admin@venapictures.com', 'password123', 'Admin Utama', 'Admin'),
 ('USR002', 'member@perusahaan.com', 'password123', 'Staff Member', 'Member');
 
 -- Insert Packages
