@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { ViewType, Client, Project, TeamMember, Transaction, Package, AddOn, TeamProjectPayment, Profile, FinancialPocket, TeamPaymentRecord, Lead, RewardLedgerEntry, User } from './types';
-import { MOCK_CLIENTS, MOCK_PROJECTS, MOCK_TEAM_MEMBERS, MOCK_TRANSACTIONS, MOCK_PACKAGES, MOCK_ADDONS, MOCK_TEAM_PROJECT_PAYMENTS, MOCK_USER_PROFILE, MOCK_FINANCIAL_POCKETS, MOCK_TEAM_PAYMENT_RECORDS, MOCK_LEADS, MOCK_REWARD_LEDGER_ENTRIES, MOCK_USERS } from './constants';
+import { SupabaseService } from './services/supabaseService';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
 import Clients from './components/Clients';
@@ -44,20 +44,82 @@ const App: React.FC = () => {
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
-  // Lifted State for global management and integration
-  const [users, setUsers] = useState<User[]>(() => JSON.parse(JSON.stringify(MOCK_USERS)));
-  const [clients, setClients] = useState<Client[]>(() => JSON.parse(JSON.stringify(MOCK_CLIENTS)));
-  const [projects, setProjects] = useState<Project[]>(() => JSON.parse(JSON.stringify(MOCK_PROJECTS)));
-  const [teamMembers, setTeamMembers] = useState<TeamMember[]>(() => JSON.parse(JSON.stringify(MOCK_TEAM_MEMBERS)));
-  const [transactions, setTransactions] = useState<Transaction[]>(() => JSON.parse(JSON.stringify(MOCK_TRANSACTIONS)));
-  const [packages, setPackages] = useState<Package[]>(() => JSON.parse(JSON.stringify(MOCK_PACKAGES)));
-  const [addOns, setAddOns] = useState<AddOn[]>(() => JSON.parse(JSON.stringify(MOCK_ADDONS)));
-  const [teamProjectPayments, setTeamProjectPayments] = useState<TeamProjectPayment[]>(() => JSON.parse(JSON.stringify(MOCK_TEAM_PROJECT_PAYMENTS)));
-  const [teamPaymentRecords, setTeamPaymentRecords] = useState<TeamPaymentRecord[]>(() => JSON.parse(JSON.stringify(MOCK_TEAM_PAYMENT_RECORDS)));
-  const [pockets, setPockets] = useState<FinancialPocket[]>(() => JSON.parse(JSON.stringify(MOCK_FINANCIAL_POCKETS)));
-  const [profile, setProfile] = useState<Profile>(() => JSON.parse(JSON.stringify(MOCK_USER_PROFILE)));
-  const [leads, setLeads] = useState<Lead[]>(() => JSON.parse(JSON.stringify(MOCK_LEADS)));
-  const [rewardLedgerEntries, setRewardLedgerEntries] = useState<RewardLedgerEntry[]>(() => JSON.parse(JSON.stringify(MOCK_REWARD_LEDGER_ENTRIES)));
+  // Load data from Supabase on app start
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        
+        const [
+          usersData,
+          clientsData,
+          projectsData,
+          teamMembersData,
+          transactionsData,
+          packagesData,
+          addOnsData,
+          teamProjectPaymentsData,
+          teamPaymentRecordsData,
+          pocketsData,
+          profileData,
+          leadsData,
+          rewardLedgerEntriesData
+        ] = await Promise.all([
+          SupabaseService.getUsers(),
+          SupabaseService.getClients(),
+          SupabaseService.getProjects(),
+          SupabaseService.getTeamMembers(),
+          SupabaseService.getTransactions(),
+          SupabaseService.getPackages(),
+          SupabaseService.getAddOns(),
+          SupabaseService.getTeamProjectPayments(),
+          SupabaseService.getTeamPaymentRecords(),
+          SupabaseService.getFinancialPockets(),
+          SupabaseService.getProfile(),
+          SupabaseService.getLeads(),
+          SupabaseService.getRewardLedgerEntries()
+        ]);
+
+        setUsers(usersData);
+        setClients(clientsData);
+        setProjects(projectsData);
+        setTeamMembers(teamMembersData);
+        setTransactions(transactionsData);
+        setPackages(packagesData);
+        setAddOns(addOnsData);
+        setTeamProjectPayments(teamProjectPaymentsData);
+        setTeamPaymentRecords(teamPaymentRecordsData);
+        setPockets(pocketsData);
+        setProfile(profileData);
+        setLeads(leadsData);
+        setRewardLedgerEntries(rewardLedgerEntriesData);
+        
+      } catch (error) {
+        console.error('Error loading data:', error);
+        showNotification('Error loading data from database');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+  }, []);
+
+  // State for global management and integration with Supabase
+  const [users, setUsers] = useState<User[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [packages, setPackages] = useState<Package[]>([]);
+  const [addOns, setAddOns] = useState<AddOn[]>([]);
+  const [teamProjectPayments, setTeamProjectPayments] = useState<TeamProjectPayment[]>([]);
+  const [teamPaymentRecords, setTeamPaymentRecords] = useState<TeamPaymentRecord[]>([]);
+  const [pockets, setPockets] = useState<FinancialPocket[]>([]);
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [leads, setLeads] = useState<Lead[]>([]);
+  const [rewardLedgerEntries, setRewardLedgerEntries] = useState<RewardLedgerEntry[]>([]);
+  const [loading, setLoading] = useState(true);
   
   const showNotification = (message: string, duration: number = 3000) => {
     setNotification(message);
@@ -87,6 +149,27 @@ const App: React.FC = () => {
   };
 
   const renderContent = () => {
+    if (loading) {
+      return (
+        <div className="flex items-center justify-center h-full">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-emerald-600 mx-auto mb-4"></div>
+            <p className="text-slate-600">Loading data...</p>
+          </div>
+        </div>
+      );
+    }
+
+    if (!profile) {
+      return (
+        <div className="flex items-center justify-center h-full">
+          <div className="text-center">
+            <p className="text-slate-600">No profile data found. Please check your database setup.</p>
+          </div>
+        </div>
+      );
+    }
+
     switch (activeView) {
       case ViewType.DASHBOARD:
         return <Dashboard 
