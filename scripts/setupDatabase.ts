@@ -438,7 +438,9 @@ const setupDatabase = async () => {
   await importMockData()
 }
 
-// Uncomment the line below to run the setup
-// setupDatabase()
+// Run the setup when file is executed directly
+if (require.main === module) {
+  setupDatabase().catch(console.error);
+}
 
 export { setupDatabase }

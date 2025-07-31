@@ -1,54 +1,48 @@
 
-const fs = require('fs');
-const path = require('path');
+const { exec } = require('child_process');
+const util = require('util');
+const execPromise = util.promisify(exec);
 
-// Read and execute SQL file
 async function setupDatabase() {
   try {
-    // Import supabase client
-    const { createClient } = require('@supabase/supabase-js');
+    console.log('Setting up database using TypeScript setup script...');
     
-    const supabaseUrl = 'https://fofaqsowmxvwjqnphsgq.supabase.co';
-    const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZvZmFxc293bXh2d2pxbnBoc2dxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM5Njk2NjgsImV4cCI6MjA2OTU0NTY2OH0.4ltXloprgcF_qQjU1FjhMgsJy5spwZQxf8W1xWz5PSg';
+    // Use ts-node to run the TypeScript setup file
+    const { stdout, stderr } = await execPromise('npx ts-node -e "import(\\"./scripts/setupDatabase.ts\\").then(m => m.setupDatabase())"');
     
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    if (stderr) {
+      console.error('Setup errors:', stderr);
+    }
     
-    // Read SQL file
-    const sqlFilePath = path.join(__dirname, 'database', 'import_data.sql');
-    const sqlContent = fs.readFileSync(sqlFilePath, 'utf8');
-    
-    // Split SQL into individual statements
-    const statements = sqlContent
-      .split(';')
-      .map(stmt => stmt.trim())
-      .filter(stmt => stmt.length > 0 && !stmt.startsWith('--') && stmt !== 'COMMIT');
-    
-    console.log('Setting up database...');
-    
-    // Execute each statement
-    for (const statement of statements) {
-      if (statement.trim()) {
-        try {
-          console.log('Executing:', statement.substring(0, 50) + '...');
-          const { error } = await supabase.rpc('exec_sql', { 
-            sql: statement + ';' 
-          });
-          
-          if (error) {
-            console.error('Error executing statement:', error);
-          } else {
-            console.log('✓ Statement executed successfully');
-          }
-        } catch (err) {
-          console.error('Error:', err.message);
-        }
-      }
+    if (stdout) {
+      console.log('Setup output:', stdout);
     }
     
     console.log('Database setup completed!');
     
   } catch (error) {
-    console.error('Setup failed:', error);
+    console.error('Setup failed:', error.message);
+    
+    // Fallback: try with node directly on compiled JS
+    console.log('Trying alternative approach...');
+    try {
+      // Install ts-node if not available
+      await execPromise('npm install --save-dev ts-node');
+      console.log('ts-node installed, retrying...');
+      
+      const { stdout: stdout2, stderr: stderr2 } = await execPromise('npx ts-node scripts/setupDatabase.ts');
+      
+      if (stderr2) {
+        console.error('Alternative setup errors:', stderr2);
+      }
+      
+      if (stdout2) {
+        console.log('Alternative setup output:', stdout2);
+      }
+      
+    } catch (altError) {
+      console.error('Alternative setup also failed:', altError.message);
+    }
   }
 }
 
